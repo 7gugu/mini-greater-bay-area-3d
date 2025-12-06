@@ -1,6 +1,12 @@
+import * as THREE from 'three';
+
 export interface Point {
     x: number;
     y: number;
+    z?: number;
+}
+
+export interface Point3D extends Point {
     z?: number;
 }
 
@@ -54,6 +60,26 @@ export function getInterpolatedPoint(path: Point[], t: number): InterpolatedPoin
     const last = path[path.length - 1];
     const prev = path[path.length - 2];
     return { x: last.x, y: last.y, angle: Math.atan2(last.y - prev.y, last.x - prev.x) };
+}
+
+/**
+ * Smooths a path of 2D/3D coordinates using Catmull-Rom Spline.
+ * @param points Array of coordinates [x, y, z?]
+ * @param segments Number of interpolated points per segment
+ * @param closed Whether the path is a closed loop
+ * @returns Smoothed array of coordinates
+ */
+export function getSmoothedPath(points: number[][], segments: number = 10, closed: boolean = false): number[][] {
+    if (points.length < 2) return points;
+
+    const vec3Points = points.map(p => new THREE.Vector3(p[0], p[1], p[2] || 0));
+    const curve = new THREE.CatmullRomCurve3(vec3Points, closed, 'catmullrom', 0.5); // tension 0.5
+    
+    // Determine total points: original segments * subdivision
+    const totalPoints = (points.length - 1) * segments;
+    const smoothedPoints = curve.getPoints(totalPoints);
+
+    return smoothedPoints.map(v => [v.x, v.y, v.z]);
 }
 
 export function createBoxMesh(AMap: any, width: number, length: number, height: number, color: number[]): any {

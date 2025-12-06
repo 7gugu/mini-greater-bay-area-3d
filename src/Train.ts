@@ -7,10 +7,9 @@ export class Train {
     customCoords: any;
     
     trip: TrainTrip;
-    tracks: Record<string, TrackGeometry>; // Reference to all tracks to look up geometry
+    tracks: Record<string, TrackGeometry>; 
     
-    // Pre-calculated WebGL Coords for cached tracks
-    // Map<TrackID, Array<[x, y]>>
+    // Use injected smoothed cache or local cache
     trackCoordsCache: Map<string, number[][]>;
 
     mesh: THREE.Mesh;
@@ -20,13 +19,21 @@ export class Train {
         map: AMap.Map, 
         customCoords: any, 
         trip: TrainTrip, 
-        tracks: Record<string, TrackGeometry>
+        tracks: Record<string, TrackGeometry>,
+        smoothedTracksCache?: Record<string, number[][]>
     ) {
         this.map = map;
         this.customCoords = customCoords;
         this.trip = trip;
         this.tracks = tracks;
         this.trackCoordsCache = new Map();
+
+        // Populate cache from injected smoothed paths if available
+        if (smoothedTracksCache) {
+            Object.keys(smoothedTracksCache).forEach(key => {
+                this.trackCoordsCache.set(key, smoothedTracksCache[key]);
+            });
+        }
 
         // Initialize Mesh
         const geometry = new THREE.BoxGeometry(200, 800, 200); 
@@ -35,12 +42,12 @@ export class Train {
         // Initially hide until valid time
         this.mesh.visible = false;
         
-        // Pre-convert coordinates for relevant tracks
+        // Pre-convert coordinates for relevant tracks ONLY if not already cached
         this.trip.legs.forEach(leg => {
             if (!this.trackCoordsCache.has(leg.trackId)) {
                 const track = this.tracks[leg.trackId];
                 if (track) {
-                    // Convert TrackPoint[] to LngLat[]
+                    // Use raw coords as fallback (not smoothed)
                     const pathLngLats = track.path.map(p => p.location);
                     const coords = this.customCoords.lngLatsToCoords(pathLngLats);
                     this.trackCoordsCache.set(leg.trackId, coords);

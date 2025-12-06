@@ -3,6 +3,7 @@ import { Train } from './Train';
 import { config } from './config';
 import { Editor } from './Editor';
 import { PlaybackController } from './PlaybackController';
+import { getSmoothedPath } from './utils';
 import '../assets/style.css'; 
 import * as THREE from 'three';
 import { MeshLine, MeshLineMaterial } from 'three.meshline';
@@ -73,12 +74,21 @@ AMapLoader.load({
         // 3. Rebuild Tracks (MeshLine)
         Object.values(railData.tracks).forEach(track => {
             const pathLngLats = track.path.map(p => p.location);
-            const coords = customCoords.lngLatsToCoords(pathLngLats);
+            let coords = customCoords.lngLatsToCoords(pathLngLats);
             
+            // Apply Smoothing!
+            // Convert to array of arrays for utils
+            // coords is Float32Array or array of array? AMap usually returns Array of arrays.
+            // But just in case, mapping is safe.
+            const rawPoints = coords.map((c: number[]) => [c[0], c[1]]);
+            
+            // Smoothing: 10 subdivisions per segment
+            const smoothedCoords = getSmoothedPath(rawPoints, 10);
+
             // 3.1 Track Lines
             const points: number[] = [];
-            for(let i=0; i<coords.length; i++) {
-                points.push(coords[i][0], coords[i][1], 20); 
+            for(let i=0; i<smoothedCoords.length; i++) {
+                points.push(smoothedCoords[i][0], smoothedCoords[i][1], 20); 
             }
             
             const line = new MeshLine();
@@ -90,7 +100,7 @@ AMapLoader.load({
                 color: new THREE.Color(color),
                 opacity: 0.8,
                 transparent: true,
-                lineWidth: 60, // World units, increased 3x
+                lineWidth: 60, // World units
                 resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
                 sizeAttenuation: 1, 
                 near: camera.near,
@@ -101,26 +111,20 @@ AMapLoader.load({
             scene.add(mesh);
             trackMeshes.push(mesh);
 
-            // 3.2 Stations (Circles)
-            // We identify stations by having a 'name' property
+            // 3.2 Stations (Circles) - Use Original Coords
+            // We render stations at the original control points (stations), not smoothed intermediate points
             track.path.forEach((p, idx) => {
                 if (p.name) {
                     const pos = coords[idx];
-                    // Station Geometry: Circle (Cylinder with low height)
-                    // Increased size 3x: 60 -> 180
                     const stationGeo = new THREE.CylinderGeometry(180, 180, 10, 32);
-                    stationGeo.rotateX(Math.PI / 2); // Lay flat
+                    stationGeo.rotateX(Math.PI / 2); 
                     
-                    // White fill, Black border effect
-                    // Use simple materials
                     const fillMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
                     const stationMesh = new THREE.Mesh(stationGeo, fillMat);
-                    stationMesh.position.set(pos[0], pos[1], 25); // Slightly above track
+                    stationMesh.position.set(pos[0], pos[1], 25); 
                     scene.add(stationMesh);
                     stationMeshes.push(stationMesh);
 
-                    // Black Border (Ring)
-                    // Increased size 3x: 50->150, 70->210
                     const borderGeo = new THREE.RingGeometry(150, 210, 32);
                     const borderMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
                     const borderMesh = new THREE.Mesh(borderGeo, borderMat);
@@ -131,13 +135,29 @@ AMapLoader.load({
             });
         });
 
-        // 4. Rebuild Trains
+        // 4. Rebuild Trains (with smoothed paths if possible?)
+        // Currently Train class calculates coords internally from LngLats.
+        // Ideally Train should also use the smoothed path for movement to match visuals.
+        // Let's update Train to accept pre-calculated smoothed coords map? 
+        // Or update Train to smooth internally.
+        // Updating Train logic is better.
+        
+        // Pre-calculate smoothed map for Trains
+        const smoothedTracksCache: Record<string, number[][]> = {};
+        Object.values(railData.tracks).forEach(track => {
+             const pathLngLats = track.path.map(p => p.location);
+             const coords = customCoords.lngLatsToCoords(pathLngLats);
+             const rawPoints = coords.map((c: number[]) => [c[0], c[1]]);
+             smoothedTracksCache[track.id] = getSmoothedPath(rawPoints, 10);
+        });
+
         railData.trips.forEach(trip => {
             const t = new Train(
                 map, 
                 customCoords,
                 trip,
-                railData.tracks
+                railData.tracks,
+                smoothedTracksCache // Pass cached smoothed paths
             );
             t.addToScene(scene);
             trains.push(t);
