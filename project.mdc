@@ -3,7 +3,7 @@
 
 # Project Context
 我们要实现一个基于 **大湾区 (Greater Bay Area)** 的高铁运行可视化项目，灵感来源于 **Mini Tokyo 3D**。
-目前我们已经完成了一个 **最小可行性产品 (MVP)**，实现了在深色地图上，让 3D 长方体（代表列车）沿着预定轨迹平滑移动。
+目前我们已经完成了核心功能开发，实现了基于真实时刻表和地理路径的列车运行模拟，并内置了一个强大的在线编辑器。
 
 # Current Tech Stack & Decisions
 1.  **Language**: TypeScript (All source code migrated to TS).
@@ -11,67 +11,53 @@
 3.  **Map Provider**: 高德地图 (AMap) JS API v2.0。
 4.  **Rendering**: 
     - 使用 `AMap.GLCustomLayer` 结合 **Three.js** (v0.160.0)。
-    - *注意*: 必须使用 Three.js v0.160.0 或更低版本，因为 AMap GLCustomLayer 目前仅支持 WebGL 1，而新版 Three.js 已移除对 WebGL 1 的支持。
-5.  **Coordinate System**: 
-    - 经纬度 (LngLat) 用于地图定位。
-    - **CustomCoords** (AMap API) 用于将经纬度转换为 WebGL/Three.js 场景坐标。
-6.  **Geometry**: 使用 Three.js 的 `BoxGeometry` 和 `MeshBasicMaterial`。
-7.  **Configuration**: 密钥管理使用 `.env` 文件。
+    - 使用 **three.meshline** 绘制有宽度、有颜色的轨道线。
+5.  **Data Structure**:
+    - `RailSystemData`: 包含 `tracks` (物理路径) 和 `trips` (时刻表)。
+    - `TrackGeometry`: 支持 Catmull-Rom 曲线平滑处理。
+6.  **UI Framework**: 原生 DOM + CSS (Glassmorphism 风格)。
 
 # Current Working Code (Stable)
 项目结构已经模块化：
-- `src/main.ts`: 入口文件，初始化地图和 GL 图层。
-- `src/Train.ts`: `Train` 类，封装了 Three.js Mesh 的创建和更新逻辑。
-- `src/utils.ts`: 几何计算工具函数 (Path Length, Interpolation)，已有单元测试覆盖。
-- `src/data.ts`: 模拟的列车时刻表和曲线路径数据。
-- `src/config.ts`: 环境配置读取。
+- `src/main.ts`: 入口文件，初始化地图、Three.js 场景、编辑器和播放控制器。
+- `src/Train.ts`: `Train` 类，封装了 Mesh 创建、位置插值更新逻辑。
+- `src/Editor.ts`: 在线编辑器，支持轨道拖拽修改、时刻表增删改、Local Storage 持久化。
+- `src/PlaybackController.ts`: 时间控制器，支持暂停/重播、时间倍速（UI待实现）、真实日期显示。
+- `src/utils.ts`: 几何计算（路径长度、Catmull-Rom 平滑插值）。
+- `src/data.ts`: 模拟数据生成与加载。
 
-核心渲染逻辑 (`src/main.ts`):
-```typescript
-const glLayer = new AMap.GLCustomLayer({
-    zIndex: 110,
-    init: (gl) => {
-        // Initialize Three.js Renderer with WebGL1 context
-        renderer = new THREE.WebGLRenderer({ context: gl, alpha: true });
-        renderer.autoClear = false;
-        scene = new THREE.Scene();
-        // ... (Lights, Camera setup) ...
-    },
-    render: () => {
-        // Sync Camera
-        const { near, far, fov, up, lookAt, position } = customCoords.getCameraParams();
-        camera.near = near;
-        camera.far = far;
-        camera.fov = fov;
-        camera.position.set(position[0], position[1], position[2]);
-        camera.up.set(up[0], up[1], up[2]);
-        camera.lookAt(lookAt[0], lookAt[1], lookAt[2]);
-        camera.updateProjectionMatrix();
-        
-        renderer.resetState();
-        renderer.render(scene, camera);
-        renderer.resetState();
-    }
-});
-map.add(glLayer);
-```
+# Completed Features
+1.  **真实数据驱动**:
+    -   支持多段行程 (`TripLeg`)。
+    -   列车位置严格基于时间戳计算。
+2.  **在线编辑器 (Online Editor)**:
+    -   **Tracks Tab**: 可视化编辑轨道路径点，支持添加/删除/重命名节点。
+    -   **Schedule Tab**: 管理列车班次和发车时间。
+    -   **Persistence**: 数据自动保存到 Local Storage。
+3.  **视觉升级**:
+    -   **轨道**: 使用 `MeshLine` 渲染发光的粗线条，支持自定义颜色。
+    -   **站点**: 自动识别并渲染为黑边白底的圆形站点。
+    -   **UI**: 现代化的深色毛玻璃风格 (Glassmorphism)。
+4.  **播放控制**:
+    -   支持暂停、重播。
+    -   显示真实的模拟时间（日期+毫秒级时间）。
+5.  **路径平滑**:
+    -   自动对折线路径应用 Catmull-Rom 插值，使列车转弯更加流畅。
 
 # Next Steps
-目前基础架构已经完善，接下来的开发重点（按优先级）：
+接下来的开发重点（按优先级）：
 
-1.  **真实数据驱动 (Real Data Integration)**:
-    -   **时刻表驱动**: 实现基于真实时刻表（JSON）的速度计算与移动动画，让列车位置严格对应时间。
-    -   **GeoJSON 路径**: 引入真实的铁轨 GeoJSON 数据，替代当前的贝塞尔曲线模拟，确保列车沿真实地理轨迹行驶。
-
-2.  **在线编辑器 (Online Editor)**:
-    -   实现“编辑模式”开关。
-    -   支持动态添加/修改轨道点 (Rail Points)。
-    -   支持动态添加/修改列车班次 (Trains) 和时刻表 (Schedule)。
-
-3.  **性能优化 (Performance)**:
+1.  **性能优化 (Performance)**:
     -   **视锥体剔除 (Frustum Culling)**: 增加不可视区域不渲染逻辑，优化大规模场景下的性能。
-    -   **轨道平滑与抽稀 (Path Optimization)**: 对密集的 GeoJSON 坐标点进行抽稀 (Simplification) 以减少内存占用，同时应用平滑算法 (Smoothing, 如 Catmull-Rom) 确保列车转弯流畅。
-    -   (可选) 使用 `InstancedMesh` 优化大量列车的渲染。
+    -   **InstancedMesh**: 当列车数量超过 100+ 时，迁移到 `InstancedMesh` 渲染列车。
 
-4.  **视觉效果 (Visuals)**:
-    -   拖尾效果 (Trails) 和发光效果 (Bloom)。
+2.  **数据集成 (Data Integration)**:
+    -   编写转换器，将真实的 GTFS 或 GeoJSON 数据转换为 `RailSystemData` 格式。
+
+3.  **视觉效果 (Visuals)**:
+    -   **发光效果 (Bloom)**: 使用 Three.js Post-processing 增加霓虹灯质感。
+    -   **拖尾效果 (Trails)**: 为高速行驶的列车增加动态拖尾。
+
+4.  **交互功能 (Interaction)**:
+    -   点击列车显示详细信息（车次、始发终到、当前速度）。
+    -   相机跟随模式（点击列车后视角锁定）。
