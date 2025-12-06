@@ -70,6 +70,7 @@ map.add(glLayer);
 
 3.  **性能优化 (Performance)**:
     -   **视锥体剔除 (Frustum Culling)**: 增加不可视区域不渲染逻辑，优化大规模场景下的性能。
+    -   **轨道平滑与抽稀 (Path Optimization)**: 对密集的 GeoJSON 坐标点进行抽稀 (Simplification) 以减少内存占用，同时应用平滑算法 (Smoothing, 如 Catmull-Rom) 确保列车转弯流畅。
     -   (可选) 使用 `InstancedMesh` 优化大量列车的渲染。
 
 4.  **视觉效果 (Visuals)**:
