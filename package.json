@@ -16,6 +16,7 @@
     "@types/jest": "^29.5.14",
     "@types/minimatch": "^5.1.2",
     "@types/node": "^22.10.1",
+    "@types/three": "^0.181.0",
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^7.1.2",
@@ -38,7 +39,7 @@
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
-    "@types/three": "0.160.0",
-    "three": "0.160.0"
+    "three": "0.160.0",
+    "three.meshline": "^1.4.0"
   }
 }

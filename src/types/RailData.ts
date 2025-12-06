@@ -22,6 +22,9 @@ export interface TrackGeometry {
     length?: number;
     // Optional: Control points for Bezier curves if generated procedurally
     controlPoints?: LngLat[]; 
+    
+    // Appearance
+    color?: string; // Hex color string e.g. "#ff0000"
 }
 
 /**

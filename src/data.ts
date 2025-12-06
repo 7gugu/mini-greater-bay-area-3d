@@ -39,7 +39,16 @@ const mainTrackPath: TrackPoint[] = mainTrackPathCoords.map((coord, i) => ({
 const tracks: Record<string, TrackGeometry> = {
     'track_sz_gz': {
         id: 'track_sz_gz',
-        path: mainTrackPath
+        path: mainTrackPath,
+        color: '#00ccff' // Cyan
+    },
+    'track_gz_sz': { // Return Track
+        id: 'track_gz_sz',
+        path: mainTrackPath.slice().reverse().map((p, i) => ({ 
+            location: [p.location[0] + 0.01, p.location[1] + 0.01], // Slight offset
+            name: p.name 
+        })),
+        color: '#ff9900' // Orange
     }
 };
 
@@ -48,10 +57,9 @@ const tracks: Record<string, TrackGeometry> = {
 const trips: TrainTrip[] = [];
 const baseTime = Date.now(); 
 
-for (let i = 0; i < 10; i++) {
-    // Staggered starts every 5 seconds
-    const departure = baseTime + i * 5000;
-    const duration = 30000; // 30s trip for demo
+for (let i = 0; i < 5; i++) {
+    const departure = baseTime + i * 8000;
+    const duration = 30000; 
     
     trips.push({
         trainId: `G${1000 + i}`,
@@ -60,6 +68,24 @@ for (let i = 0; i < 10; i++) {
                 trackId: 'track_sz_gz',
                 fromStationId: 'SZ_NORTH',
                 toStationId: 'GZ_SOUTH',
+                departureTime: departure,
+                arrivalTime: departure + duration
+            }
+        ]
+    });
+}
+
+for (let i = 0; i < 5; i++) {
+    const departure = baseTime + i * 9000 + 2000;
+    const duration = 30000; 
+    
+    trips.push({
+        trainId: `D${2000 + i}`,
+        legs: [
+            {
+                trackId: 'track_gz_sz',
+                fromStationId: 'GZ_SOUTH',
+                toStationId: 'SZ_NORTH',
                 departureTime: departure,
                 arrivalTime: departure + duration
             }
@@ -85,5 +111,4 @@ if (savedData) {
 
 export const railData = finalData;
 
-// Export raw generated path for camera initialization if needed
 export const initialCenter = mainTrackPath[0].location;
