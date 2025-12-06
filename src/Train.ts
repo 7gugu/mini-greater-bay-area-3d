@@ -40,7 +40,9 @@ export class Train {
             if (!this.trackCoordsCache.has(leg.trackId)) {
                 const track = this.tracks[leg.trackId];
                 if (track) {
-                    const coords = this.customCoords.lngLatsToCoords(track.path);
+                    // Convert TrackPoint[] to LngLat[]
+                    const pathLngLats = track.path.map(p => p.location);
+                    const coords = this.customCoords.lngLatsToCoords(pathLngLats);
                     this.trackCoordsCache.set(leg.trackId, coords);
                 }
             }

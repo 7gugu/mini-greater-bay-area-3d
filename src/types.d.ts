@@ -3,11 +3,12 @@ declare namespace AMap {
     class Map {
         constructor(div: string | HTMLElement, opts: any);
         add(obj: any): void;
+        remove(obj: any): void; // Missing remove
         setCenter(center: any, immediate?: boolean): void;
         lngLatToGeodeticCoord(lnglat: any): { x: number, y: number };
         geodeticCoordToLngLat(pixel: Pixel): any;
-        plugin(name: string, callback: () => void): void;
-        customCoords: any; // CustomCoords property
+        plugin(name: string | string[], callback: () => void): void; // string[] support
+        customCoords: any; 
         render(): void;
     }
     class Pixel {
@@ -22,11 +23,21 @@ declare namespace AMap {
         getLng(): number;
         getLat(): number;
     }
-    // Removed Object3D definitions as we are switching to GLCustomLayer + Three.js
     
     class GLCustomLayer {
         constructor(opts: any);
         setzIndex(z: number): void;
+    }
+
+    class Polyline {
+        constructor(opts: any);
+        getPath(): any[];
+    }
+    
+    class PolylineEditor {
+        constructor(map: Map, polyline: Polyline);
+        open(): void;
+        close(): void;
     }
 }
 

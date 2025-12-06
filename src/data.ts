@@ -1,4 +1,4 @@
-import { RailSystemData, TrackGeometry, TrainTrip } from './types/RailData';
+import { RailSystemData, TrackGeometry, TrainTrip, TrackPoint } from './types/RailData';
 
 // Helper to generate curve points (reused)
 function getCurvePoints(p1: number[], p2: number[], control: number[], segments: number): [number, number][] {
@@ -30,7 +30,11 @@ const control: [number, number] = [
     (start[1] + end[1]) / 2 - 0.1
 ];
 
-const mainTrackPath = getCurvePoints(start, end, control, 100);
+const mainTrackPathCoords = getCurvePoints(start, end, control, 100);
+const mainTrackPath: TrackPoint[] = mainTrackPathCoords.map((coord, i) => ({
+    location: coord,
+    name: i === 0 ? 'Shenzhen North' : (i === mainTrackPathCoords.length - 1 ? 'Guangzhou South' : undefined)
+}));
 
 const tracks: Record<string, TrackGeometry> = {
     'track_sz_gz': {
@@ -63,10 +67,23 @@ for (let i = 0; i < 10; i++) {
     });
 }
 
-export const railData: RailSystemData = {
-    tracks,
-    trips
-};
+// Try load from LocalStorage
+const savedData = localStorage.getItem('railData');
+let finalData: RailSystemData;
+
+if (savedData) {
+    try {
+        finalData = JSON.parse(savedData);
+        console.log('Loaded railData from LocalStorage');
+    } catch (e) {
+        console.error('Failed to parse saved railData, using default', e);
+        finalData = { tracks, trips };
+    }
+} else {
+    finalData = { tracks, trips };
+}
+
+export const railData = finalData;
 
 // Export raw generated path for camera initialization if needed
-export const initialCenter = mainTrackPath[0];
+export const initialCenter = mainTrackPath[0].location;

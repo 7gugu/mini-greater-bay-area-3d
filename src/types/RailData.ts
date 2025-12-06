@@ -5,6 +5,11 @@
  */
 export type LngLat = [number, number];
 
+export interface TrackPoint {
+    location: LngLat;
+    name?: string; // User defined name for the point (e.g. "Station A")
+}
+
 /**
  * Represents a physical track path (geometry) in the real world.
  * This decouples geometry from the schedule.
@@ -12,7 +17,7 @@ export type LngLat = [number, number];
 export interface TrackGeometry {
     id: string;
     // The sequence of coordinates forming the track
-    path: LngLat[]; 
+    path: TrackPoint[]; 
     // Optional: Pre-calculated length in meters (useful for uniform speed calculation)
     length?: number;
     // Optional: Control points for Bezier curves if generated procedurally
@@ -50,4 +55,3 @@ export interface RailSystemData {
     tracks: Record<string, TrackGeometry>; // Map trackId -> Geometry
     trips: TrainTrip[];
 }
-

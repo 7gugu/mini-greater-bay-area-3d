@@ -1,7 +1,7 @@
 import { railData, initialCenter } from './data';
 import { Train } from './Train';
 import { config } from './config';
-import { InterpolatedPoint } from './utils';
+import { Editor } from './Editor';
 import '../assets/style.css'; 
 import * as THREE from 'three';
 
@@ -15,7 +15,7 @@ const AMAP_KEY = config.AMAP_KEY;
 AMapLoader.load({
     key: AMAP_KEY,
     version: "2.0",
-    plugins: [] 
+    plugins: ['AMap.PolylineEditor'] // Load Editor Plugin
 }).then((AMap: any) => {
     const map = new AMap.Map('container', {
         viewMode: '3D', pitch: 60, zoom: 14, center: initialCenter,
@@ -30,6 +30,31 @@ AMapLoader.load({
     let scene: THREE.Scene;
     const trains: Train[] = [];
     
+    // Editor Initialization
+    const editor = new Editor(map, AMap);
+    
+    // Reload Trains when data changes (e.g., track path modified)
+    editor.onDataUpdate = () => {
+        // Since Train caches coords, we need to rebuild or update them
+        // For MVP, simplistic approach: Clear trains and Re-init
+        // NOTE: In production, just update the specific train's cached path.
+        console.log("Data Updated, refreshing trains...");
+        // Actually, we need to recreate trains because their constructor caches the WebGL coords
+        scene.remove(...trains.map(t => t.mesh));
+        trains.length = 0;
+        
+        railData.trips.forEach(trip => {
+            const t = new Train(
+                map, 
+                customCoords,
+                trip,
+                railData.tracks
+            );
+            t.addToScene(scene);
+            trains.push(t);
+        });
+    };
+
     const glLayer = new AMap.GLCustomLayer({
         zIndex: 110,
         init: (gl: WebGLRenderingContext) => {
@@ -54,7 +79,7 @@ AMapLoader.load({
             directionalLight.position.set(1000, -100, 900);
             scene.add(directionalLight);
             
-            // Initialize Trains from Real Data Structure
+            // Initialize Trains
             railData.trips.forEach(trip => {
                 const t = new Train(
                     map, 
@@ -68,9 +93,6 @@ AMapLoader.load({
         },
         render: () => {
             renderer.resetState();
-            
-            // For now, center is fixed at initial path start.
-            // If paths span huge area, dynamic re-centering might be needed.
             customCoords.setCenter(initialCenter);
 
             const { near, far, fov, up, lookAt, position } = customCoords.getCameraParams();
@@ -78,6 +100,7 @@ AMapLoader.load({
             camera.near = near;
             camera.far = far;
             camera.fov = fov;
+            // Spread operator fix
             camera.position.set(position[0], position[1], position[2]);
             camera.up.set(up[0], up[1], up[2]);
             camera.lookAt(lookAt[0], lookAt[1], lookAt[2]);
