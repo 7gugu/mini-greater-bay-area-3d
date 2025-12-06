@@ -3,6 +3,178 @@ body, html, #container {
     height: 100%;
     margin: 0;
     overflow: hidden;
-    background: #000;
+    background: #0f172a; /* Darker blue-ish background */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* --- UI Components --- */
+
+.ui-panel {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    color: #e2e8f0;
+    padding: 16px;
+    transition: all 0.3s ease;
+}
+
+.ui-panel h3, .ui-panel h4 {
+    margin: 0 0 12px 0;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #fff;
+}
+
+.ui-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.ui-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.ui-button:active {
+    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ui-button.primary {
+    background: #3b82f6; /* Blue */
+    border-color: #3b82f6;
+}
+.ui-button.primary:hover {
+    background: #2563eb;
+}
+
+.ui-button.danger {
+    background: rgba(239, 68, 68, 0.2); /* Red tint */
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+.ui-button.danger:hover {
+    background: rgba(239, 68, 68, 0.4);
+}
+
+.ui-button.success {
+    background: rgba(34, 197, 94, 0.2); /* Green tint */
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.ui-button.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* --- Inputs --- */
+.ui-input, .ui-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    margin-bottom: 8px;
+    outline: none;
+}
+
+.ui-input:focus, .ui-select:focus {
+    border-color: #3b82f6;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* --- Time Display --- */
+.time-display {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: #60a5fa;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+    margin-bottom: 12px;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+/* --- Tab System --- */
+.ui-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.ui-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.ui-tab-btn:hover {
+    color: #fff;
+}
+
+.ui-tab-btn.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* --- List Items --- */
+.ui-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+.ui-list-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.ui-list-item:last-child {
+    border-bottom: none;
+}
+
+.ui-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.ui-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+.ui-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ui-scroll-container::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+}

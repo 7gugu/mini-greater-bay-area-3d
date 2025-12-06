@@ -6,18 +6,15 @@ export class Editor {
     AMap: any;
     isEditing: boolean = false;
     
-    // Editor State
     activePolyline: any | null = null;
     activeEditor: any | null = null;
     currentTrackId: string | null = null;
 
-    // UI Elements
     container: HTMLElement;
     contentContainer: HTMLElement;
     tabContainer: HTMLElement;
     activeTab: 'tracks' | 'schedule' = 'tracks';
 
-    // Callbacks
     onDataUpdate: (() => void) | null = null;
 
     constructor(map: AMap.Map, AMap: any) {
@@ -28,61 +25,65 @@ export class Editor {
 
     createUI() {
         this.container = document.createElement('div');
+        this.container.className = 'ui-panel'; // Use new class
         this.container.style.position = 'absolute';
-        this.container.style.top = '10px';
-        this.container.style.right = '10px';
-        this.container.style.width = '350px';
-        this.container.style.maxHeight = '90vh';
-        this.container.style.overflowY = 'auto';
-        this.container.style.background = 'rgba(0, 0, 0, 0.8)';
-        this.container.style.color = '#fff';
-        this.container.style.borderRadius = '5px';
+        this.container.style.top = '20px';
+        this.container.style.right = '20px';
+        this.container.style.width = '360px';
+        this.container.style.maxHeight = '85vh';
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
         this.container.style.zIndex = '1000';
-        this.container.style.padding = '10px';
 
         // Header
         const header = document.createElement('div');
         header.style.display = 'flex';
         header.style.justifyContent = 'space-between';
-        header.style.marginBottom = '10px';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '16px';
         
         const title = document.createElement('h3');
         title.textContent = 'Rail Editor';
-        title.style.margin = '0';
         header.appendChild(title);
         
         const toggleBtn = document.createElement('button');
-        toggleBtn.textContent = 'Toggle Edit Mode';
-        toggleBtn.onclick = () => this.toggleEditMode();
+        toggleBtn.className = 'ui-button';
+        toggleBtn.textContent = 'Edit Mode';
+        toggleBtn.onclick = () => {
+            this.toggleEditMode();
+            toggleBtn.classList.toggle('active');
+        };
         header.appendChild(toggleBtn);
         this.container.appendChild(header);
 
         // Tab Container
         this.tabContainer = document.createElement('div');
-        this.tabContainer.style.display = 'none'; // Hidden initially
-        this.tabContainer.style.marginBottom = '10px';
+        this.tabContainer.className = 'ui-tabs';
+        this.tabContainer.style.display = 'none'; 
         this.tabContainer.innerHTML = `
-            <div style="display: flex; gap: 5px;">
-                <button id="tab-tracks" style="flex: 1;">Tracks</button>
-                <button id="tab-schedule" style="flex: 1;">Schedule</button>
-            </div>
+            <button id="tab-tracks" class="ui-tab-btn active">Tracks</button>
+            <button id="tab-schedule" class="ui-tab-btn">Schedule</button>
         `;
         this.container.appendChild(this.tabContainer);
 
         // Content Container
         this.contentContainer = document.createElement('div');
-        this.contentContainer.style.display = 'none'; // Hidden initially
+        this.contentContainer.className = 'ui-scroll-container';
+        this.contentContainer.style.display = 'none'; 
+        this.contentContainer.style.flex = '1';
+        this.contentContainer.style.overflowY = 'auto';
         this.container.appendChild(this.contentContainer);
 
         // Footer Actions
         const footer = document.createElement('div');
-        footer.style.marginTop = '10px';
-        footer.style.borderTop = '1px solid #444';
-        footer.style.paddingTop = '10px';
+        footer.style.marginTop = '16px';
+        footer.style.paddingTop = '16px';
+        footer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
         footer.style.display = 'flex';
-        footer.style.gap = '5px';
+        footer.style.gap = '8px';
         
         const exportBtn = document.createElement('button');
+        exportBtn.className = 'ui-button';
         exportBtn.textContent = 'Log JSON';
         exportBtn.style.flex = '1';
         exportBtn.onclick = () => {
@@ -92,9 +93,9 @@ export class Editor {
         footer.appendChild(exportBtn);
 
         const resetBtn = document.createElement('button');
-        resetBtn.textContent = 'Reset';
+        resetBtn.className = 'ui-button danger';
+        resetBtn.textContent = 'Reset Data';
         resetBtn.style.flex = '1';
-        resetBtn.style.background = '#f44336';
         resetBtn.onclick = () => {
             if(confirm('Clear local storage and reset data?')) {
                 localStorage.removeItem('railData');
@@ -107,7 +108,6 @@ export class Editor {
 
         document.body.appendChild(this.container);
         
-        // Bind Tab Events
         this.container.querySelector('#tab-tracks')!.addEventListener('click', () => this.switchTab('tracks'));
         this.container.querySelector('#tab-schedule')!.addEventListener('click', () => this.switchTab('schedule'));
     }
@@ -116,7 +116,7 @@ export class Editor {
         this.isEditing = !this.isEditing;
         
         if (this.isEditing) {
-            this.tabContainer.style.display = 'block';
+            this.tabContainer.style.display = 'flex';
             this.contentContainer.style.display = 'block';
             this.switchTab(this.activeTab);
         } else {
@@ -128,18 +128,20 @@ export class Editor {
 
     switchTab(tab: 'tracks' | 'schedule') {
         this.activeTab = tab;
-        this.contentContainer.innerHTML = ''; // Clear content
+        this.contentContainer.innerHTML = ''; 
         
         // Update Tab Styles
-        const trackBtn = this.container.querySelector('#tab-tracks') as HTMLElement;
-        const scheduleBtn = this.container.querySelector('#tab-schedule') as HTMLElement;
-        trackBtn.style.background = tab === 'tracks' ? '#4CAF50' : '';
-        scheduleBtn.style.background = tab === 'schedule' ? '#4CAF50' : '';
-
+        const trackBtn = this.container.querySelector('#tab-tracks')!;
+        const scheduleBtn = this.container.querySelector('#tab-schedule')!;
+        
         if (tab === 'tracks') {
+            trackBtn.classList.add('active');
+            scheduleBtn.classList.remove('active');
             this.renderTracksUI();
         } else {
-            this.stopEditingTrack(); // Stop track editing when switching away
+            scheduleBtn.classList.add('active');
+            trackBtn.classList.remove('active');
+            this.stopEditingTrack(); 
             this.renderScheduleUI();
         }
     }
@@ -159,12 +161,15 @@ export class Editor {
         const wrapper = document.createElement('div');
         
         const selectLabel = document.createElement('label');
-        selectLabel.textContent = 'Select Track: ';
+        selectLabel.textContent = 'Select Track';
+        selectLabel.style.display = 'block';
+        selectLabel.style.marginBottom = '6px';
+        selectLabel.style.fontSize = '12px';
+        selectLabel.style.color = '#94a3b8';
         wrapper.appendChild(selectLabel);
 
         const select = document.createElement('select');
-        select.style.width = '100%';
-        select.style.marginBottom = '10px';
+        select.className = 'ui-select';
         
         Object.keys(railData.tracks).forEach(id => {
             const opt = document.createElement('option');
@@ -183,15 +188,16 @@ export class Editor {
         // Point List Container
         const pointListDiv = document.createElement('div');
         pointListDiv.id = 'point-list';
-        pointListDiv.style.maxHeight = '300px';
+        pointListDiv.className = 'ui-scroll-container';
+        pointListDiv.style.maxHeight = '400px';
         pointListDiv.style.overflowY = 'auto';
-        pointListDiv.style.border = '1px solid #555';
-        pointListDiv.style.marginTop = '10px';
+        pointListDiv.style.background = 'rgba(0,0,0,0.2)';
+        pointListDiv.style.borderRadius = '6px';
+        pointListDiv.style.marginTop = '12px';
         wrapper.appendChild(pointListDiv);
 
         this.contentContainer.appendChild(wrapper);
 
-        // Auto-select first if none selected
         if (!this.currentTrackId && Object.keys(railData.tracks).length > 0) {
             this.startEditingTrack(Object.keys(railData.tracks)[0]);
             select.value = this.currentTrackId!;
@@ -209,23 +215,24 @@ export class Editor {
         
         track.path.forEach((pt, idx) => {
             const row = document.createElement('div');
+            row.className = 'ui-list-item';
             row.style.display = 'flex';
-            row.style.gap = '5px';
-            row.style.padding = '5px';
-            row.style.borderBottom = '1px solid #444';
-            row.style.alignItems = 'center';
+            row.style.gap = '8px';
 
             // Index
             const idxSpan = document.createElement('span');
             idxSpan.textContent = `#${idx}`;
-            idxSpan.style.width = '30px';
+            idxSpan.style.width = '24px';
+            idxSpan.style.fontSize = '12px';
+            idxSpan.style.color = '#64748b';
             row.appendChild(idxSpan);
 
             // Name
             const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.placeholder = 'Name';
-            nameInput.style.width = '80px';
+            nameInput.className = 'ui-input';
+            nameInput.style.marginBottom = '0';
+            nameInput.placeholder = 'Point Name';
+            nameInput.style.flex = '2';
             nameInput.value = pt.name || '';
             nameInput.onchange = (e) => {
                 pt.name = (e.target as HTMLInputElement).value;
@@ -233,35 +240,52 @@ export class Editor {
             };
             row.appendChild(nameInput);
 
-            // Coords (Lng/Lat)
+            // Coords Group (Stacked)
+            const coordGroup = document.createElement('div');
+            coordGroup.style.display = 'flex';
+            coordGroup.style.flexDirection = 'column';
+            coordGroup.style.gap = '4px';
+            coordGroup.style.flex = '1';
+
             const lngInput = document.createElement('input');
+            lngInput.className = 'ui-input';
+            lngInput.style.marginBottom = '0';
+            lngInput.style.padding = '4px';
+            lngInput.style.fontSize = '11px';
             lngInput.type = 'number';
             lngInput.step = '0.00001';
-            lngInput.style.width = '70px';
             lngInput.value = pt.location[0].toString();
             lngInput.onchange = (e) => {
                 pt.location[0] = parseFloat((e.target as HTMLInputElement).value);
                 this.updatePolylineFromData();
                 this.triggerUpdate();
             };
-            row.appendChild(lngInput);
+            coordGroup.appendChild(lngInput);
 
             const latInput = document.createElement('input');
+            latInput.className = 'ui-input';
+            latInput.style.marginBottom = '0';
+            latInput.style.padding = '4px';
+            latInput.style.fontSize = '11px';
             latInput.type = 'number';
             latInput.step = '0.00001';
-            latInput.style.width = '70px';
             latInput.value = pt.location[1].toString();
             latInput.onchange = (e) => {
                 pt.location[1] = parseFloat((e.target as HTMLInputElement).value);
                 this.updatePolylineFromData();
                 this.triggerUpdate();
             };
-            row.appendChild(latInput);
+            coordGroup.appendChild(latInput);
+
+            row.appendChild(coordGroup);
 
             // Delete Btn
             const delBtn = document.createElement('button');
-            delBtn.textContent = 'x';
-            delBtn.style.color = 'red';
+            delBtn.innerHTML = '×';
+            delBtn.className = 'ui-button danger';
+            delBtn.style.padding = '4px 8px';
+            delBtn.style.height = 'fit-content';
+            delBtn.style.alignSelf = 'center';
             delBtn.onclick = () => {
                 track.path.splice(idx, 1);
                 this.updatePolylineFromData();
@@ -275,11 +299,11 @@ export class Editor {
 
         // Add Point Button
         const addBtn = document.createElement('button');
+        addBtn.className = 'ui-button primary';
         addBtn.textContent = '+ Add Point';
         addBtn.style.width = '100%';
-        addBtn.style.marginTop = '5px';
+        addBtn.style.marginTop = '8px';
         addBtn.onclick = () => {
-            // Add near last point or default
             const last = track.path[track.path.length - 1];
             const newLoc: LngLat = last ? [last.location[0] + 0.001, last.location[1] + 0.001] : [114.0, 22.6];
             track.path.push({ location: newLoc });
@@ -299,9 +323,9 @@ export class Editor {
         const path = track.path.map(p => p.location);
         this.activePolyline = new this.AMap.Polyline({
             path: path,
-            strokeColor: "#FF33FF", 
+            strokeColor: "#3b82f6", // Matches UI primary color
             strokeWeight: 6,
-            strokeOpacity: 0.9,
+            strokeOpacity: 0.8,
             zIndex: 200,
             bubble: true
         });
@@ -314,7 +338,6 @@ export class Editor {
         this.activeEditor = new this.AMap.PolylineEditor(this.map, this.activePolyline);
         this.activeEditor.open();
 
-        // Listen to editor events to sync list
         this.activeEditor.on('addnode', (e: any) => this.syncDataFromPolyline());
         this.activeEditor.on('removenode', (e: any) => this.syncDataFromPolyline());
         this.activeEditor.on('adjust', (e: any) => this.syncDataFromPolyline());
@@ -322,14 +345,9 @@ export class Editor {
 
     syncDataFromPolyline() {
         if (!this.currentTrackId || !this.activePolyline) return;
-        const newPath = this.activePolyline.getPath(); // Array of AMap.LngLat
+        const newPath = this.activePolyline.getPath(); 
         const track = railData.tracks[this.currentTrackId];
 
-        // We try to preserve metadata (name) if length matches or minimal change
-        // But for full flexibility, we just map new coords.
-        // If length changed, we might lose names of shifted points unless we diff.
-        // For MVP: Rebuild path array, keeping names for indices that exist.
-        
         const newTrackPoints: TrackPoint[] = newPath.map((p: any, i: number) => {
             const existing = track.path[i];
             return {
@@ -339,7 +357,7 @@ export class Editor {
         });
         
         track.path = newTrackPoints;
-        this.renderPointList(); // Refresh list to show new coords
+        this.renderPointList();
         this.triggerUpdate();
     }
 
@@ -348,8 +366,6 @@ export class Editor {
         const track = railData.tracks[this.currentTrackId];
         const path = track.path.map(p => p.location);
         this.activePolyline.setPath(path);
-        // Editor needs refresh? Usually setPath updates view, but editor handles might need reset.
-        // Re-opening editor is safest
         if (this.activeEditor) {
             this.activeEditor.close();
             this.activeEditor.open();
@@ -358,8 +374,6 @@ export class Editor {
 
     stopEditingTrack() {
         if (this.activeEditor) {
-            // Final sync not needed as we sync on events, but good measure
-            // this.syncDataFromPolyline(); 
             this.activeEditor.close();
             this.activeEditor = null;
         }
@@ -375,37 +389,38 @@ export class Editor {
         this.contentContainer.innerHTML = '';
         const wrapper = document.createElement('div');
         
-        // List of Trips
         const listContainer = document.createElement('div');
-        listContainer.style.maxHeight = '300px';
+        listContainer.className = 'ui-scroll-container';
+        listContainer.style.maxHeight = '400px';
         listContainer.style.overflowY = 'auto';
-        listContainer.style.marginBottom = '10px';
-        listContainer.style.border = '1px solid #555';
+        listContainer.style.background = 'rgba(0,0,0,0.2)';
+        listContainer.style.borderRadius = '6px';
+        listContainer.style.marginBottom = '12px';
 
         railData.trips.forEach((trip, index) => {
             const item = document.createElement('div');
-            item.style.padding = '5px';
-            item.style.borderBottom = '1px solid #444';
-            item.style.display = 'flex';
-            item.style.justifyContent = 'space-between';
-            item.style.alignItems = 'center';
+            item.className = 'ui-list-item';
             
             const info = document.createElement('span');
-            const startTime = new Date(trip.legs[0]?.departureTime || 0).toLocaleTimeString();
-            info.textContent = `${trip.trainId} (${startTime})`;
+            const startTime = new Date(trip.legs[0]?.departureTime || 0).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            info.innerHTML = `<strong style="color:#fff">${trip.trainId}</strong> <span style="color:#94a3b8; font-size:12px">(${startTime})</span>`;
             item.appendChild(info);
             
             const btnGroup = document.createElement('div');
+            btnGroup.style.display = 'flex';
+            btnGroup.style.gap = '4px';
             
             const editBtn = document.createElement('button');
+            editBtn.className = 'ui-button';
+            editBtn.style.padding = '4px 8px';
             editBtn.textContent = 'Edit';
-            editBtn.style.marginRight = '5px';
             editBtn.onclick = () => this.renderTripForm(index);
             btnGroup.appendChild(editBtn);
             
             const delBtn = document.createElement('button');
+            delBtn.className = 'ui-button danger';
+            delBtn.style.padding = '4px 8px';
             delBtn.textContent = 'Del';
-            delBtn.style.background = '#d32f2f';
             delBtn.onclick = () => {
                 if(confirm('Delete ' + trip.trainId + '?')) {
                     railData.trips.splice(index, 1);
@@ -421,8 +436,8 @@ export class Editor {
 
         wrapper.appendChild(listContainer);
 
-        // Add New Trip Button
         const addBtn = document.createElement('button');
+        addBtn.className = 'ui-button primary';
         addBtn.textContent = '+ Add New Trip';
         addBtn.style.width = '100%';
         addBtn.onclick = () => {
@@ -444,17 +459,27 @@ export class Editor {
         
         const wrapper = document.createElement('div');
         
-        // Back Button
         const backBtn = document.createElement('button');
-        backBtn.textContent = '< Back to List';
+        backBtn.className = 'ui-button';
+        backBtn.style.marginBottom = '12px';
+        backBtn.textContent = '← Back to List';
         backBtn.onclick = () => this.renderScheduleUI();
         wrapper.appendChild(backBtn);
 
-        // Train ID Input
         const idRow = document.createElement('div');
-        idRow.style.margin = '10px 0';
-        idRow.innerHTML = `<label>Train ID: </label>`;
+        idRow.style.marginBottom = '16px';
+        
+        const label = document.createElement('div');
+        label.textContent = 'Train ID';
+        label.style.fontSize = '12px';
+        label.style.color = '#94a3b8';
+        label.style.marginBottom = '4px';
+        idRow.appendChild(label);
+
         const idInput = document.createElement('input');
+        idInput.className = 'ui-input';
+        idInput.style.fontSize = '16px';
+        idInput.style.fontWeight = 'bold';
         idInput.type = 'text';
         idInput.value = trip.trainId;
         idInput.onchange = (e) => {
@@ -467,17 +492,17 @@ export class Editor {
         // Legs Section
         const legsContainer = document.createElement('div');
         const renderLegs = () => {
-            legsContainer.innerHTML = '<h4>Legs</h4>';
+            legsContainer.innerHTML = '<h4 style="margin:0 0 8px 0; font-size:14px; color:#94a3b8">Legs</h4>';
             trip.legs.forEach((leg, idx) => {
                 const legDiv = document.createElement('div');
-                legDiv.style.border = '1px solid #555';
-                legDiv.style.padding = '5px';
-                legDiv.style.marginBottom = '5px';
+                legDiv.style.background = 'rgba(255,255,255,0.05)';
+                legDiv.style.borderRadius = '6px';
+                legDiv.style.padding = '10px';
+                legDiv.style.marginBottom = '8px';
                 
                 // Track Selector
-                const trackRow = document.createElement('div');
-                trackRow.innerHTML = `<label>Track: </label>`;
                 const trackSel = document.createElement('select');
+                trackSel.className = 'ui-select';
                 Object.keys(railData.tracks).forEach(tid => {
                     const opt = document.createElement('option');
                     opt.value = tid;
@@ -489,52 +514,61 @@ export class Editor {
                     leg.trackId = (e.target as HTMLSelectElement).value;
                     this.triggerUpdate();
                 };
-                trackRow.appendChild(trackSel);
-                legDiv.appendChild(trackRow);
+                legDiv.appendChild(trackSel);
 
                 // Time Inputs
-                const tsToVal = (ts: number) => new Date(ts).toISOString().slice(0, 16);
+                const tsToVal = (ts: number) => {
+                    const d = new Date(ts);
+                    // Adjust to local ISO string for input
+                    // This quick hack accounts for timezone offset
+                    const tzOffset = d.getTimezoneOffset() * 60000;
+                    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+                };
+                
                 const valToTs = (val: string) => new Date(val).getTime();
 
-                const timeRow = document.createElement('div');
-                timeRow.style.display = 'flex';
-                timeRow.style.flexDirection = 'column';
-                timeRow.style.gap = '5px';
-                timeRow.style.marginTop = '5px';
+                const timeGrid = document.createElement('div');
+                timeGrid.style.display = 'grid';
+                timeGrid.style.gridTemplateColumns = '1fr 1fr';
+                timeGrid.style.gap = '8px';
+                timeGrid.style.marginTop = '8px';
                 
-                // Departure
-                const depDiv = document.createElement('div');
-                depDiv.innerHTML = `<label>Dep: </label>`;
-                const depInput = document.createElement('input');
-                depInput.type = 'datetime-local';
-                depInput.value = tsToVal(leg.departureTime);
-                depInput.onchange = (e) => {
-                    leg.departureTime = valToTs((e.target as HTMLInputElement).value);
-                    this.triggerUpdate();
+                const createTimeInput = (label: string, val: number, onChange: (ts: number) => void) => {
+                    const d = document.createElement('div');
+                    const l = document.createElement('div');
+                    l.textContent = label;
+                    l.style.fontSize = '11px';
+                    l.style.color = '#94a3b8';
+                    d.appendChild(l);
+                    const inp = document.createElement('input');
+                    inp.className = 'ui-input';
+                    inp.style.marginBottom = '0';
+                    inp.type = 'datetime-local';
+                    inp.value = tsToVal(val);
+                    inp.onchange = (e) => onChange(valToTs((e.target as HTMLInputElement).value));
+                    d.appendChild(inp);
+                    return d;
                 };
-                depDiv.appendChild(depInput);
-                timeRow.appendChild(depDiv);
-                
-                // Arrival
-                const arrDiv = document.createElement('div');
-                arrDiv.innerHTML = `<label>Arr: </label>`;
-                const arrInput = document.createElement('input');
-                arrInput.type = 'datetime-local';
-                arrInput.value = tsToVal(leg.arrivalTime);
-                arrInput.onchange = (e) => {
-                    leg.arrivalTime = valToTs((e.target as HTMLInputElement).value);
-                    this.triggerUpdate();
-                };
-                arrDiv.appendChild(arrInput);
-                timeRow.appendChild(arrDiv);
 
-                legDiv.appendChild(timeRow);
+                timeGrid.appendChild(createTimeInput('Departure', leg.departureTime, (ts) => {
+                    leg.departureTime = ts;
+                    this.triggerUpdate();
+                }));
+
+                timeGrid.appendChild(createTimeInput('Arrival', leg.arrivalTime, (ts) => {
+                    leg.arrivalTime = ts;
+                    this.triggerUpdate();
+                }));
+
+                legDiv.appendChild(timeGrid);
                 
-                // Remove Leg Button
                 const rmBtn = document.createElement('button');
+                rmBtn.className = 'ui-button danger';
                 rmBtn.textContent = 'Remove Leg';
-                rmBtn.style.marginTop = '5px';
+                rmBtn.style.marginTop = '8px';
+                rmBtn.style.width = '100%';
                 rmBtn.style.fontSize = '12px';
+                rmBtn.style.padding = '4px';
                 rmBtn.onclick = () => {
                     trip.legs.splice(idx, 1);
                     renderLegs();
@@ -545,9 +579,11 @@ export class Editor {
                 legsContainer.appendChild(legDiv);
             });
 
-            // Add Leg Button
             const addLegBtn = document.createElement('button');
+            addLegBtn.className = 'ui-button';
             addLegBtn.textContent = '+ Add Leg';
+            addLegBtn.style.width = '100%';
+            addLegBtn.style.marginTop = '8px';
             addLegBtn.onclick = () => {
                 const now = Date.now();
                 const firstTrack = Object.keys(railData.tracks)[0];

@@ -2,6 +2,7 @@ import { railData, initialCenter } from './data';
 import { Train } from './Train';
 import { config } from './config';
 import { Editor } from './Editor';
+import { PlaybackController } from './PlaybackController';
 import '../assets/style.css'; 
 import * as THREE from 'three';
 
@@ -30,16 +31,32 @@ AMapLoader.load({
     let scene: THREE.Scene;
     const trains: Train[] = [];
     
+    // Playback Controller
+    // Use the baseTime from data generation to align with the schedule
+    // railData generation uses Date.now(). Let's use the earliest trip time or just Date.now() if we assume live.
+    // In src/data.ts, trips start at baseTime.
+    // We should probably expose baseTime from data.ts or just estimate.
+    // For now, let's just init with Date.now() and assume data is relative to *now* when loaded.
+    // Actually src/data.ts executes Date.now() on load.
+    
+    // Better approach: Find the earliest departure time in railData
+    let minTime = Infinity;
+    if (railData.trips.length > 0) {
+        railData.trips.forEach(t => {
+            t.legs.forEach(l => {
+                if (l.departureTime < minTime) minTime = l.departureTime;
+            });
+        });
+    }
+    const startTime = minTime === Infinity ? Date.now() : minTime;
+
+    const playback = new PlaybackController(startTime);
+    
     // Editor Initialization
     const editor = new Editor(map, AMap);
     
-    // Reload Trains when data changes (e.g., track path modified)
     editor.onDataUpdate = () => {
-        // Since Train caches coords, we need to rebuild or update them
-        // For MVP, simplistic approach: Clear trains and Re-init
-        // NOTE: In production, just update the specific train's cached path.
         console.log("Data Updated, refreshing trains...");
-        // Actually, we need to recreate trains because their constructor caches the WebGL coords
         scene.remove(...trains.map(t => t.mesh));
         trains.length = 0;
         
@@ -100,7 +117,6 @@ AMapLoader.load({
             camera.near = near;
             camera.far = far;
             camera.fov = fov;
-            // Spread operator fix
             camera.position.set(position[0], position[1], position[2]);
             camera.up.set(up[0], up[1], up[2]);
             camera.lookAt(lookAt[0], lookAt[1], lookAt[2]);
@@ -113,11 +129,19 @@ AMapLoader.load({
     
     map.add(glLayer);
 
+    let lastTime = Date.now();
+
     function animate() {
         const now = Date.now();
+        const deltaTime = now - lastTime;
+        lastTime = now;
+
+        playback.update(deltaTime);
+        
+        const simTime = playback.currentTime;
         
         trains.forEach(train => {
-            train.update(now);
+            train.update(simTime);
         });
         
         map.render();
