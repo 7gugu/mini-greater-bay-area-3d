@@ -1,34 +1,50 @@
 import { InterpolatedPoint, Point } from './utils';
 import * as THREE from 'three';
+import { TrainTrip, TripLeg, TrackGeometry } from './types/RailData';
 
 export class Train {
     map: AMap.Map;
-    pathLngLats: number[][];
-    startTime: number;
-    duration: number;
-    pathCoords: number[][]; // Use customCoords
-    mesh: THREE.Mesh;
-    trail: THREE.Line; // We will need to implement trail in Three.js
-    active: boolean;
-    customCoords: any; // AMap.CustomCoords
+    customCoords: any;
+    
+    trip: TrainTrip;
+    tracks: Record<string, TrackGeometry>; // Reference to all tracks to look up geometry
+    
+    // Pre-calculated WebGL Coords for cached tracks
+    // Map<TrackID, Array<[x, y]>>
+    trackCoordsCache: Map<string, number[][]>;
 
-    constructor(map: AMap.Map, customCoords: any, pathLngLats: number[][], startTime: number, duration: number = 30000) {
+    mesh: THREE.Mesh;
+    active: boolean = true;
+
+    constructor(
+        map: AMap.Map, 
+        customCoords: any, 
+        trip: TrainTrip, 
+        tracks: Record<string, TrackGeometry>
+    ) {
         this.map = map;
         this.customCoords = customCoords;
-        this.pathLngLats = pathLngLats;
-        this.startTime = startTime; 
-        this.duration = duration;
-        
-        // Precompute CustomCoords for path
-        // Ensure input is [lng, lat]
-        this.pathCoords = this.customCoords.lngLatsToCoords(this.pathLngLats);
-        
-        // Train Mesh (Box)
-        const geometry = new THREE.BoxGeometry(200, 800, 200); // BoxBufferGeometry is now BoxGeometry in newer Three
+        this.trip = trip;
+        this.tracks = tracks;
+        this.trackCoordsCache = new Map();
+
+        // Initialize Mesh
+        const geometry = new THREE.BoxGeometry(200, 800, 200); 
         const material = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.9 });
         this.mesh = new THREE.Mesh(geometry, material);
+        // Initially hide until valid time
+        this.mesh.visible = false;
         
-        this.active = true;
+        // Pre-convert coordinates for relevant tracks
+        this.trip.legs.forEach(leg => {
+            if (!this.trackCoordsCache.has(leg.trackId)) {
+                const track = this.tracks[leg.trackId];
+                if (track) {
+                    const coords = this.customCoords.lngLatsToCoords(track.path);
+                    this.trackCoordsCache.set(leg.trackId, coords);
+                }
+            }
+        });
     }
     
     addToScene(scene: THREE.Scene) {
@@ -36,53 +52,46 @@ export class Train {
     }
 
     update(currentTime: number): Point | null {
-        if (!this.active) return null;
-        
-        const cycle = this.duration + 5000;
-        const elapsed = (currentTime - this.startTime) % cycle;
-        
-        if (elapsed > this.duration) {
+        // Find current leg
+        const currentLeg = this.trip.legs.find(leg => 
+            currentTime >= leg.departureTime && currentTime <= leg.arrivalTime
+        );
+
+        if (!currentLeg) {
+            // Not on any leg (either waiting at station or finished)
             this.mesh.visible = false;
+            // TODO: Optional - Show at station if waiting between legs?
             return null;
-        } else {
-            this.mesh.visible = true;
         }
 
-        const progress = elapsed / this.duration;
+        this.mesh.visible = true;
         
-        // Interpolate using pathCoords (which are in Three.js world space relative to center)
-        // We need a helper that works with simple arrays
-        const cur = this.getInterpolatedCoord(this.pathCoords, progress);
+        // Calculate progress in current leg
+        const duration = currentLeg.arrivalTime - currentLeg.departureTime;
+        const elapsed = currentTime - currentLeg.departureTime;
+        const progress = Math.min(1, Math.max(0, elapsed / duration));
+        
+        const pathCoords = this.trackCoordsCache.get(currentLeg.trackId);
+        if (!pathCoords) return null;
+
+        const cur = this.getInterpolatedCoord(pathCoords, progress);
         
         if (cur) {
-            this.mesh.position.set(cur.x, cur.y, 100); // z=100 (half height)
-            
-            // Rotation - Three.js rotation is typically Euler (x, y, z)
-            // Our angle is in XY plane.
-            // In AMap GLCustomLayer space (usually Z up if using standard coords? No, let's check doc)
-            // Doc example: mesh.position.set(d[0], d[1], 500);
-            // So XY is map plane, Z is height.
-            // Angle from atan2(dy, dx) is typically counter-clockwise from X.
-            // Train is aligned with Y axis (length 800 in Y)? 
-            // My geometry: BoxGeometry(200, 800, 200). Y is 800. So it points along Y.
-            // If angle is 0 (moving along X), we want Y axis of mesh to point X. Rotation -90 deg (-PI/2).
-            // Let's try: rotation.z = angle - PI/2.
-            
+            this.mesh.position.set(cur.x, cur.y, 100); 
+            // Rotation: -90 deg offset as model faces Y
             this.mesh.rotation.z = cur.angle - Math.PI / 2;
-            
             return cur;
         }
+        
         return null;
     }
     
-    // Re-implement interpolation for plain number arrays (coords)
+    // Re-implement interpolation (similar to before)
     getInterpolatedCoord(path: number[][], t: number): InterpolatedPoint | null {
          if (!path || path.length < 2) return null;
 
-        // Helper for distance
         const dist = (p1: number[], p2: number[]) => Math.sqrt(Math.pow(p2[0]-p1[0], 2) + Math.pow(p2[1]-p1[1], 2));
 
-        // Total length
         let totalLen = 0;
         for(let i=0; i<path.length-1; i++) totalLen += dist(path[i], path[i+1]);
         

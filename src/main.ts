@@ -1,4 +1,4 @@
-import { generatedRailPath, schedule } from './data';
+import { railData, initialCenter } from './data';
 import { Train } from './Train';
 import { config } from './config';
 import { InterpolatedPoint } from './utils';
@@ -18,16 +18,12 @@ AMapLoader.load({
     plugins: [] 
 }).then((AMap: any) => {
     const map = new AMap.Map('container', {
-        viewMode: '3D', pitch: 60, zoom: 14, center: generatedRailPath[0],
+        viewMode: '3D', pitch: 60, zoom: 14, center: initialCenter,
         mapStyle: 'amap://styles/dark', skyColor: '#1f263a'
     });
 
-    // Use GLCustomLayer with Three.js
     const customCoords = map.customCoords;
-    
-    // Set center for coordinate conversion precision
-    // We pick the first point of rail path as reference
-    customCoords.setCenter(generatedRailPath[0]);
+    customCoords.setCenter(initialCenter);
 
     let camera: THREE.PerspectiveCamera;
     let renderer: THREE.WebGLRenderer;
@@ -46,28 +42,25 @@ AMapLoader.load({
 
             renderer = new THREE.WebGLRenderer({
                 context: gl,
-                alpha: true, // Important for transparency
+                alpha: true, 
             });
             renderer.autoClear = false;
             
             scene = new THREE.Scene();
 
-            // Lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(1000, -100, 900);
             scene.add(directionalLight);
             
-            // Initialize Trains
-            const baseTime = Date.now();
-            schedule.forEach(s => {
+            // Initialize Trains from Real Data Structure
+            railData.trips.forEach(trip => {
                 const t = new Train(
                     map, 
                     customCoords,
-                    generatedRailPath, 
-                    baseTime + s.startTime, 
-                    s.duration
+                    trip,
+                    railData.tracks
                 );
                 t.addToScene(scene);
                 trains.push(t);
@@ -76,18 +69,15 @@ AMapLoader.load({
         render: () => {
             renderer.resetState();
             
-            // Important: Update customCoords center if needed, but usually fixed center for small areas is fine.
-            // If area is large, might need to update center dynamically or use multiple centers?
-            // For this demo, let's keep it simple.
-            customCoords.setCenter(generatedRailPath[0]);
+            // For now, center is fixed at initial path start.
+            // If paths span huge area, dynamic re-centering might be needed.
+            customCoords.setCenter(initialCenter);
 
             const { near, far, fov, up, lookAt, position } = customCoords.getCameraParams();
             
             camera.near = near;
             camera.far = far;
             camera.fov = fov;
-            // Spread operator issues if type is number[] but expect [x,y,z] tuple or args
-            // customCoords.getCameraParams() returns arrays for vectors
             camera.position.set(position[0], position[1], position[2]);
             camera.up.set(up[0], up[1], up[2]);
             camera.lookAt(lookAt[0], lookAt[1], lookAt[2]);
@@ -102,29 +92,17 @@ AMapLoader.load({
 
     function animate() {
         const now = Date.now();
-        let firstActivePos: InterpolatedPoint | null = null;
         
         trains.forEach(train => {
-            const pos = train.update(now);
-            // We need to convert pos back to LngLat if we want camera follow
-            // But train.update returns pos in CustomCoords space (relative to center)
-            if (pos && !firstActivePos) {
-                // We'll need a way to get LngLat from CustomCoords if we want to setCenter
-                // AMap customCoords doesn't easily reverse coordsToLngLats publicly in doc?
-                // Actually we can just use the progress to get LngLat from original pathLngLats?
-                // For now, let's skip camera follow or implement it using original lat/lng interpolation.
-                // firstActivePos = pos; 
-            }
+            train.update(now);
         });
         
-        // Map render triggers GL layer render
         map.render();
         requestAnimationFrame(animate);
     }
     
     animate();
 
-    // Handle resize
     window.addEventListener('resize', () => {
         if(camera && renderer) {
              camera.aspect = window.innerWidth / window.innerHeight;
