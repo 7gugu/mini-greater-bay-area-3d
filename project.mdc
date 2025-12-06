@@ -1,128 +1,71 @@
-这是一个为你准备的**项目接力 Prompt（提示词）**。
-
-你可以将这段话发送给我（或者其他的 AI），以便让对方立刻理解当前的项目进度、技术栈选择以及已经解决的核心 Bug，从而无缝继续开发后续功能（如对接真实数据、多车次并发等）。
-
----
-
-### 复制以下内容作为 Prompt：
-
-```markdown
 # Role
-你是一位精通 WebGL 和高德地图 (AMap JS API v2.0) 开发的资深前端工程师。
+你是一位精通 WebGL、Three.js 和高德地图 (AMap JS API v2.0) 开发的资深前端工程师。
 
 # Project Context
 我们要实现一个基于 **大湾区 (Greater Bay Area)** 的高铁运行可视化项目，灵感来源于 **Mini Tokyo 3D**。
-目前我们已经完成了一个 **最小可行性产品 (MVP)**，实现了在深色地图上，让一个 3D 长方体（代表列车）沿着预定轨迹平滑移动并进行相机跟随。
+目前我们已经完成了一个 **最小可行性产品 (MVP)**，实现了在深色地图上，让 3D 长方体（代表列车）沿着预定轨迹平滑移动。
 
 # Current Tech Stack & Decisions
-1. **Map Provider**: 高德地图 (AMap) JS API v2.0。
-2. **Rendering**: 放弃了 Three.js，改用高德原生的 `AMap.Object3DLayer` 和 `AMap.Object3D.Mesh`。
-   - *原因*: 解决了坐标转换导致的模型消失问题，且原生 API 性能更佳，无版本冲突。
-3. **Coordinate System**: 
-   - 经纬度 (LngLat) 用于地图定位。
-   - **Geodetic Coord (P20)** 用于 `Object3D` 的 `position` 更新（这是解决模型不显示的关键）。
-4. **Geometry**: 手动构建顶点的长方体 Mesh，颜色为发光的青色。
+1.  **Language**: TypeScript (All source code migrated to TS).
+2.  **Build System**: Webpack + Jest (Unit Testing).
+3.  **Map Provider**: 高德地图 (AMap) JS API v2.0。
+4.  **Rendering**: 
+    - 使用 `AMap.GLCustomLayer` 结合 **Three.js** (v0.160.0)。
+    - *注意*: 必须使用 Three.js v0.160.0 或更低版本，因为 AMap GLCustomLayer 目前仅支持 WebGL 1，而新版 Three.js 已移除对 WebGL 1 的支持。
+5.  **Coordinate System**: 
+    - 经纬度 (LngLat) 用于地图定位。
+    - **CustomCoords** (AMap API) 用于将经纬度转换为 WebGL/Three.js 场景坐标。
+6.  **Geometry**: 使用 Three.js 的 `BoxGeometry` 和 `MeshBasicMaterial`。
+7.  **Configuration**: 密钥管理使用 `.env` 文件。
 
 # Current Working Code (Stable)
-以下是目前已经跑通、无报错、核心功能正常的代码框架。请基于此代码进行后续开发，不要破坏现有的渲染逻辑。
+项目结构已经模块化：
+- `src/main.ts`: 入口文件，初始化地图和 GL 图层。
+- `src/Train.ts`: `Train` 类，封装了 Three.js Mesh 的创建和更新逻辑。
+- `src/utils.ts`: 几何计算工具函数 (Path Length, Interpolation)，已有单元测试覆盖。
+- `src/data.ts`: 模拟的列车时刻表和曲线路径数据。
+- `src/config.ts`: 环境配置读取。
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>GBA 3D Rail - Stable Context</title>
-    <style>
-        body, html, #container { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
-    </style>
-    <script type="text/javascript">
-        window._AMapSecurityConfig = { securityJsCode: 'YOUR_SEC_CODE' }
-    </script>
-    <script src="https://webapi.amap.com/loader.js"></script>
-</head>
-<body>
-<div id="container"></div>
-<script>
-    const AMAP_KEY = 'YOUR_KEY';
-    const railPath = [[114.02919, 22.60954], [113.26436, 22.99423]]; // 简化的起终点
-
-    AMapLoader.load({
-        key: AMAP_KEY,
-        version: "2.0",
-        plugins: [] // 手动加载插件以防报错
-    }).then((AMap) => {
-        const map = new AMap.Map('container', {
-            viewMode: '3D', pitch: 60, zoom: 11, center: railPath[0],
-            mapStyle: 'amap://styles/dark', skyColor: '#1f263a'
-        });
-
-        // 核心修复：显式加载 Object3DLayer 避免 constructor 报错
-        AMap.plugin('AMap.Object3DLayer', function() {
-            const object3DLayer = new AMap.Object3DLayer();
-            map.add(object3DLayer);
-
-            // 构建长方体 Mesh
-            const trainMesh = new AMap.Object3D.Mesh();
-            const geometry = trainMesh.geometry;
-            // ... (此处省略了构建长方体 vertices 和 faces 的代码，参考上文完整版) ...
-            
-            // 填充颜色
-            for(let i=0; i<geometry.vertices.length/3; i++){
-                geometry.vertexColors.push(0, 0.8, 1, 0.9);
-            }
-            trainMesh.transparent = true;
-            trainMesh.backOrFront = 'both';
-            object3DLayer.add(trainMesh);
-
-            // 预计算 P20 坐标
-            const pathP20 = railPath.map(lnglat => {
-                const p = map.lngLatToGeodeticCoord(lnglat);
-                return { x: p.x, y: p.y };
-            });
-
-            let progress = 0;
-            function animate() {
-                progress += 0.001;
-                if(progress > 1) progress = 0;
-                // 插值计算
-                const cur = getInterpolatedPoint(pathP20, progress); // 需实现该辅助函数
-                if (cur) {
-                    // 移动 Mesh (使用 P20 坐标)
-                    trainMesh.position.x = cur.x;
-                    trainMesh.position.y = cur.y;
-                    trainMesh.position.z = 0;
-                    // 旋转 Mesh
-                    trainMesh.rotation.z = -(cur.angle * 180 / Math.PI) + 90;
-                    object3DLayer.reDraw();
-                    // 相机跟随
-                    map.setCenter(map.geodeticCoordToLngLat(new AMap.Pixel(cur.x, cur.y)), true);
-                }
-                requestAnimationFrame(animate);
-            }
-            animate();
-        });
-    });
-    // 辅助函数 getInterpolatedPoint 已在当前环境中定义
-</script>
-</body>
-</html>
+核心渲染逻辑 (`src/main.ts`):
+```typescript
+const glLayer = new AMap.GLCustomLayer({
+    zIndex: 110,
+    init: (gl) => {
+        // Initialize Three.js Renderer with WebGL1 context
+        renderer = new THREE.WebGLRenderer({ context: gl, alpha: true });
+        renderer.autoClear = false;
+        scene = new THREE.Scene();
+        // ... (Lights, Camera setup) ...
+    },
+    render: () => {
+        // Sync Camera
+        const { near, far, fov, up, lookAt, position } = customCoords.getCameraParams();
+        camera.near = near;
+        camera.far = far;
+        camera.fov = fov;
+        camera.position.set(position[0], position[1], position[2]);
+        camera.up.set(up[0], up[1], up[2]);
+        camera.lookAt(lookAt[0], lookAt[1], lookAt[2]);
+        camera.updateProjectionMatrix();
+        
+        renderer.resetState();
+        renderer.render(scene, camera);
+        renderer.resetState();
+    }
+});
+map.add(glLayer);
 ```
 
-# Next Steps (My Requirements)
-现在基础架构已经稳定，请帮我基于上述代码实现以下功能：
-
-[请在此处填写你接下来的需求，例如：]
-1.  **数据对接**: 我有一个包含列车时刻表（JSON格式）的数据，如何将其映射到这个系统中，让列车根据真实时间发车？
-2.  **多车并发**: 如何封装一个 `Train` 类，支持同时渲染几十辆列车而不影响性能？
-3.  **视觉优化**: 如何给这个青色的长方体增加“拖尾”效果或者更赛博朋克的贴图？
-4.  **真实路径**: 目前是直线插值，如何引入真实的铁轨 GeoJSON 数据并让列车沿弯道行驶？
-```
-
----
-
-### 为什么要这样整理？
-
-1.  **明确上下文**：AI 不知道你之前经历了“黑屏”、“报错”的调试过程。如果不告诉它我们已经放弃了 Three.js 并解决了坐标问题，它可能会给你生成旧的、有 bug 的 Three.js 代码。
-2.  **锁定技术栈**：强制 AI 使用 `AMap.Object3D`，避免它引入额外的库。
-3.  **提供基准代码**：让 AI 在一段**已知可运行**的代码上做加法，而不是从零开始写，这样出错率最低。
-
+# Next Steps
+目前基础架构已经完善，接下来的开发重点：
+1.  **视觉效果增强**:
+    - 为列车添加发光效果 (Bloom/Glow)。
+    - 重新实现拖尾效果 (Trail)，使用 Three.js 的 `TrailRenderer` 或自定义 Mesh。
+2.  **真实数据集成**:
+    - 对接真实的高铁时刻表数据。
+    - 引入真实的铁轨 GeoJSON 数据。
+3.  **性能优化**:
+    - 当列车数量增加时，考虑使用 `InstancedMesh` 进行渲染优化。
+4.  **交互功能**:
+    - 点击列车显示详细信息。
+    - 视角切换（跟随模式/自由模式）。
