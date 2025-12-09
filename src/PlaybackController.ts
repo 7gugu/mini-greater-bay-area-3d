@@ -53,6 +53,20 @@ export class PlaybackController {
         resetBtn.onclick = () => this.reset();
         controls.appendChild(resetBtn);
 
+        // Clear Data
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'ui-button danger';
+        clearBtn.style.flex = '1';
+        clearBtn.innerHTML = '<span style="font-size:16px">🗑</span> Reset Data';
+        clearBtn.title = 'Clear Local Data';
+        clearBtn.onclick = () => {
+             if (confirm('是否重置本地数据并重新加载? (Reset local data?)')) {
+                localStorage.removeItem('railData');
+                location.reload();
+            }
+        };
+        controls.appendChild(clearBtn);
+
         this.container.appendChild(controls);
         document.body.appendChild(this.container);
     }

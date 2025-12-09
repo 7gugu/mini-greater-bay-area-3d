@@ -88,9 +88,20 @@ export class Editor {
         exportBtn.style.flex = '1';
         exportBtn.onclick = () => {
             console.log(JSON.stringify(railData, null, 2));
-            alert('Data logged to console');
+            alert('Data logged to console (Pretty)');
         };
         footer.appendChild(exportBtn);
+
+        const whistleBtn = document.createElement('button');
+        whistleBtn.className = 'ui-button';
+        whistleBtn.textContent = 'Whistle JSON';
+        whistleBtn.style.flex = '1';
+        whistleBtn.title = 'Log minified JSON for Whistle mock';
+        whistleBtn.onclick = () => {
+            console.log(JSON.stringify(railData));
+            alert('Data logged to console (Minified for Whistle)');
+        };
+        footer.appendChild(whistleBtn);
 
         const resetBtn = document.createElement('button');
         resetBtn.className = 'ui-button danger';

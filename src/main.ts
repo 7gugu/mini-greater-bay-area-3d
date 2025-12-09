@@ -34,6 +34,7 @@ AMapLoader.load({
     const trains: Train[] = [];
     const trackMeshes: THREE.Mesh[] = []; 
     const stationMeshes: THREE.Mesh[] = [];
+    const stationMarkers: any[] = []; // Store AMap.Text markers
 
     // Playback Controller
     let minTime = Infinity;
@@ -70,6 +71,10 @@ AMapLoader.load({
             (m.material as THREE.Material).dispose();
         });
         stationMeshes.length = 0;
+
+        // Cleanup Text Markers
+        map.remove(stationMarkers);
+        stationMarkers.length = 0;
 
         // 3. Rebuild Tracks (MeshLine)
         Object.values(railData.tracks).forEach(track => {
@@ -131,6 +136,26 @@ AMapLoader.load({
                     borderMesh.position.set(pos[0], pos[1], 26);
                     scene.add(borderMesh);
                     stationMeshes.push(borderMesh);
+
+                    // Add AMap.Text for Station Name
+                    const textMarker = new AMap.Text({
+                        text: p.name,
+                        anchor: 'bottom-center',
+                        position: p.location, // LngLat
+                        offset: new AMap.Pixel(0, -15), // Move up slightly
+                        style: {
+                            'background-color': 'rgba(0,0,0,0.7)',
+                            'border-radius': '4px',
+                            'border': '1px solid rgba(255,255,255,0.3)',
+                            'color': '#fff',
+                            'font-size': '12px',
+                            'padding': '2px 6px',
+                            'box-shadow': '0 2px 6px rgba(0,0,0,0.3)'
+                        },
+                        zIndex: 120
+                    });
+                    map.add(textMarker);
+                    stationMarkers.push(textMarker);
                 }
             });
         });
