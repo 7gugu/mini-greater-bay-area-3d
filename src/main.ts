@@ -1,4 +1,4 @@
-import { railData, initialCenter } from './data';
+import { railData, loadRailData, initialCenterWGS84 } from './data';
 import { Train } from './Train';
 import { config } from './config';
 import { Editor } from './Editor';
@@ -19,7 +19,24 @@ AMapLoader.load({
     key: AMAP_KEY,
     version: "2.0",
     plugins: ['AMap.PolylineEditor'] 
-}).then((AMap: any) => {
+}).then(async (AMap: any) => {
+    // 1. Convert Initial Center
+    let initialCenter: [number, number] = initialCenterWGS84;
+    try {
+        await new Promise<void>((resolve) => {
+             AMap.convertFrom(initialCenterWGS84, 'gps', (status: string, result: any) => {
+                if (status === 'complete' && result.info === 'ok') {
+                     const loc = result.locations[0];
+                    initialCenter = [loc.getLng(), loc.getLat()];
+                }
+                resolve();
+             });
+        });
+    } catch(e) { console.error("Center conversion failed", e); }
+
+    // 2. Load Rail Data (Populates railData)
+    await loadRailData(AMap);
+
     const map = new AMap.Map('container', {
         viewMode: '3D', pitch: 60, zoom: 14, center: initialCenter,
         mapStyle: 'amap://styles/dark', skyColor: '#1f263a'

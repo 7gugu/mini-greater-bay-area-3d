@@ -1,5 +1,4 @@
 import { RailSystemData, TrackGeometry, TrainTrip, TrackPoint } from './types/RailData';
-import { wgs84ToGcj02 } from './coord_transform';
 
 // Helper to interpolate points between stations
 function interpolatePoints(p1: [number, number], p2: [number, number], segments: number): TrackPoint[] {
@@ -16,10 +15,8 @@ function interpolatePoints(p1: [number, number], p2: [number, number], segments:
     return points;
 }
 
-// Station Coordinates (WGS84) -> Will be converted
-// Updated with more accurate approximate locations to avoid "flying lines"
-// Specifically fixing TML and adding TKL
-const stationsWGS84: Record<string, [number, number]> = {
+// Station Coordinates (WGS84)
+const stationsSource: Record<string, [number, number]> = {
     // Island Line (Blue)
     'ISL_KET': [114.1278, 22.2812], // Kennedy Town
     'ISL_HKU': [114.1352, 22.2842],
@@ -163,13 +160,6 @@ const stationsWGS84: Record<string, [number, number]> = {
     'SIL_SOH': [114.1530, 22.2401],
 };
 
-// Apply Coordinate Transformation (WGS84 -> GCJ02)
-const stations: Record<string, [number, number]> = {};
-Object.entries(stationsWGS84).forEach(([id, coord]) => {
-    stations[id] = wgs84ToGcj02(coord[0], coord[1]);
-});
-
-
 // Line Definitions
 const lines = [
     { id: 'ISL', name: 'Island Line', color: '#0071CE', stations: ['ISL_KET', 'ISL_HKU', 'ISL_SYP', 'ISL_SHW', 'ISL_CEN', 'ISL_ADM', 'ISL_WAC', 'ISL_CAB', 'ISL_TIH', 'ISL_FOH', 'ISL_NOP', 'ISL_QUB', 'ISL_TAK', 'ISL_SWH', 'ISL_SKW', 'ISL_HFC', 'ISL_CHW'] },
@@ -186,12 +176,42 @@ const lines = [
     { id: 'SIL', name: 'South Island Line', color: '#B6BD00', stations: ['SIL_ADM', 'SIL_OCP', 'SIL_WCH', 'SIL_LET', 'SIL_SOH'] },
 ];
 
-// Generate Rail Data
-const tracks: Record<string, TrackGeometry> = {};
-const trips: TrainTrip[] = [];
+async function convertCoords(AMap: any, coords: [number, number][]): Promise<[number, number][]> {
+    return new Promise((resolve, reject) => {
+        AMap.convertFrom(coords, 'gps', (status: string, result: any) => {
+            if (status === 'complete' && result.info === 'ok') {
+                const converted = result.locations.map((l: any) => [l.getLng(), l.getLat()]);
+                resolve(converted);
+            } else {
+                reject(new Error('Coord conversion failed'));
+            }
+        });
+    });
+}
+
+async function convertAllCoords(AMap: any, coords: [number, number][]): Promise<[number, number][]> {
+    const CHUNK_SIZE = 40;
+    const results: [number, number][] = [];
+    for (let i = 0; i < coords.length; i += CHUNK_SIZE) {
+        const chunk = coords.slice(i, i + CHUNK_SIZE);
+        const convertedChunk = await convertCoords(AMap, chunk);
+        results.push(...convertedChunk);
+    }
+    return results;
+}
 
 // Helper to generate schedule
-function generateSchedule(lineId: string, trackId: string, stationList: string[], startTime: number, intervalMs: number, count: number, speedKmph: number = 60) {
+function generateSchedule(
+    stations: Record<string, [number, number]>,
+    trips: TrainTrip[],
+    lineId: string, 
+    trackId: string, 
+    stationList: string[], 
+    startTime: number, 
+    intervalMs: number, 
+    count: number, 
+    speedKmph: number = 60
+) {
     for (let i = 0; i < count; i++) {
         const departureTime = startTime + i * intervalMs;
         const legs: any[] = [];
@@ -230,57 +250,72 @@ function generateSchedule(lineId: string, trackId: string, stationList: string[]
     }
 }
 
-// Build Data
-lines.forEach(line => {
-    // 1. Forward Track
-    const forwardPath: TrackPoint[] = [];
-    for(let i=0; i<line.stations.length-1; i++) {
-        const p1 = stations[line.stations[i]];
-        const p2 = stations[line.stations[i+1]];
-        
-        forwardPath.push({ location: p1, name: line.stations[i] });
-        
-        // Use fewer segments for smoother but efficient lines
-        const inter = interpolatePoints(p1, p2, 5); 
-        inter.forEach(p => forwardPath.push(p));
-    }
-    forwardPath.push({ location: stations[line.stations[line.stations.length-1]], name: line.stations[line.stations.length-1] });
-
-    const trackIdFwd = `track_${line.id}_fwd`;
-    tracks[trackIdFwd] = {
-        id: trackIdFwd,
-        path: forwardPath,
-        color: line.color
-    };
-
-    // 2. Backward Track
-    const backwardPath = [...forwardPath].reverse().map(p => ({
-        // Slight offset for visual separation (approx 10m)
-        location: [p.location[0] + 0.0001, p.location[1] + 0.0001] as [number, number], 
-        name: p.name
-    }));
-    const trackIdBwd = `track_${line.id}_bwd`;
-    tracks[trackIdBwd] = {
-        id: trackIdBwd,
-        path: backwardPath,
-        color: line.color
-    };
-
-    // 3. Generate Schedule
-    const now = Date.now();
-    // Schedule Config:
-    // - High frequency for urban lines (ISL, TWL, KTL, TKL): 3 mins
-    // - Medium for others: 5-8 mins
-    const interval = ['ISL', 'TWL', 'KTL', 'TKL'].includes(line.id.split('_')[0]) ? 3 * 60 * 1000 : 6 * 60 * 1000;
+export async function getHkRailData(AMap: any): Promise<RailSystemData> {
+    const stationKeys = Object.keys(stationsSource);
+    const stationCoords = stationKeys.map(k => stationsSource[k]);
     
-    generateSchedule(line.id, trackIdFwd, line.stations, now, interval, 15);
-    generateSchedule(line.id, trackIdBwd, [...line.stations].reverse(), now + 120000, interval, 15);
-});
+    const convertedCoords = await convertAllCoords(AMap, stationCoords);
+    
+    const stations: Record<string, [number, number]> = {};
+    stationKeys.forEach((key, idx) => {
+        stations[key] = convertedCoords[idx];
+    });
 
-export const hkRailData: RailSystemData = {
-    tracks,
-    trips
-};
+    const tracks: Record<string, TrackGeometry> = {};
+    const trips: TrainTrip[] = [];
 
-// Export initial center (Converted Central Station)
-export const initialCenter: [number, number] = stations['ISL_CEN'];
+    // Build Data
+    lines.forEach(line => {
+        // 1. Forward Track
+        const forwardPath: TrackPoint[] = [];
+        for(let i=0; i<line.stations.length-1; i++) {
+            const p1 = stations[line.stations[i]];
+            const p2 = stations[line.stations[i+1]];
+            
+            forwardPath.push({ location: p1, name: line.stations[i] });
+            
+            // Use fewer segments for smoother but efficient lines
+            const inter = interpolatePoints(p1, p2, 5); 
+            inter.forEach(p => forwardPath.push(p));
+        }
+        forwardPath.push({ location: stations[line.stations[line.stations.length-1]], name: line.stations[line.stations.length-1] });
+
+        const trackIdFwd = `track_${line.id}_fwd`;
+        tracks[trackIdFwd] = {
+            id: trackIdFwd,
+            path: forwardPath,
+            color: line.color
+        };
+
+        // 2. Backward Track
+        const backwardPath = [...forwardPath].reverse().map(p => ({
+            // Slight offset for visual separation (approx 10m)
+            location: [p.location[0] + 0.0001, p.location[1] + 0.0001] as [number, number], 
+            name: p.name
+        }));
+        const trackIdBwd = `track_${line.id}_bwd`;
+        tracks[trackIdBwd] = {
+            id: trackIdBwd,
+            path: backwardPath,
+            color: line.color
+        };
+
+        // 3. Generate Schedule
+        const now = Date.now();
+        // Schedule Config:
+        // - High frequency for urban lines (ISL, TWL, KTL, TKL): 3 mins
+        // - Medium for others: 5-8 mins
+        const interval = ['ISL', 'TWL', 'KTL', 'TKL'].includes(line.id.split('_')[0]) ? 3 * 60 * 1000 : 6 * 60 * 1000;
+        
+        generateSchedule(stations, trips, line.id, trackIdFwd, line.stations, now, interval, 15);
+        generateSchedule(stations, trips, line.id, trackIdBwd, [...line.stations].reverse(), now + 120000, interval, 15);
+    });
+
+    return {
+        tracks,
+        trips
+    };
+}
+
+// Export initial center (WGS84)
+export const initialCenterWGS84: [number, number] = stationsSource['ISL_CEN'];
