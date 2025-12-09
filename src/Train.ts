@@ -48,6 +48,8 @@ export class Train {
                 const track = this.tracks[leg.trackId];
                 if (track) {
                     // Use raw coords as fallback (not smoothed)
+                    // Note: This fallback path might fail the "index * 10" logic if not smoothed!
+                    // But main.ts ensures we pass smoothed cache.
                     const pathLngLats = track.path.map(p => p.location);
                     const coords = this.customCoords.lngLatsToCoords(pathLngLats);
                     this.trackCoordsCache.set(leg.trackId, coords);
@@ -81,9 +83,36 @@ export class Train {
         const progress = Math.min(1, Math.max(0, elapsed / duration));
         
         const pathCoords = this.trackCoordsCache.get(currentLeg.trackId);
-        if (!pathCoords) return null;
+        const track = this.tracks[currentLeg.trackId];
+        
+        if (!pathCoords || !track) return null;
 
-        const cur = this.getInterpolatedCoord(pathCoords, progress);
+        // Find Station Indices
+        // We assume track.path matches the smoothed path structure (segment count = 10)
+        const fromIdx = track.path.findIndex(p => p.name === currentLeg.fromStationId);
+        const toIdx = track.path.findIndex(p => p.name === currentLeg.toStationId);
+
+        if (fromIdx === -1 || toIdx === -1) return null;
+
+        // Extract Sub-segment
+        // Assuming 10 segments per hop
+        const SEGMENTS = 10;
+        let segmentPath: number[][];
+
+        if (fromIdx < toIdx) {
+            // Forward
+            const start = fromIdx * SEGMENTS;
+            const end = toIdx * SEGMENTS;
+            segmentPath = pathCoords.slice(start, end + 1);
+        } else {
+            // Backward
+            const start = toIdx * SEGMENTS;
+            const end = fromIdx * SEGMENTS;
+            // Slice then reverse to simulate backward movement
+            segmentPath = pathCoords.slice(start, end + 1).reverse();
+        }
+
+        const cur = this.getInterpolatedCoord(segmentPath, progress);
         
         if (cur) {
             this.mesh.position.set(cur.x, cur.y, 100); 

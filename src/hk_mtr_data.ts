@@ -1,20 +1,5 @@
 import { RailSystemData, TrackGeometry, TrainTrip, TrackPoint } from './types/RailData';
 
-// Helper to interpolate points between stations
-function interpolatePoints(p1: [number, number], p2: [number, number], segments: number): TrackPoint[] {
-    const points: TrackPoint[] = [];
-    for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        points.push({
-            location: [
-                p1[0] + (p2[0] - p1[0]) * t,
-                p1[1] + (p2[1] - p1[1]) * t
-            ]
-        });
-    }
-    return points;
-}
-
 // Station Coordinates (WGS84)
 const stationsSource: Record<string, [number, number]> = {
     // Island Line (Blue)
@@ -266,49 +251,31 @@ export async function getHkRailData(AMap: any): Promise<RailSystemData> {
 
     // Build Data
     lines.forEach(line => {
-        // 1. Forward Track
-        const forwardPath: TrackPoint[] = [];
-        for(let i=0; i<line.stations.length-1; i++) {
-            const p1 = stations[line.stations[i]];
-            const p2 = stations[line.stations[i+1]];
-            
-            forwardPath.push({ location: p1, name: line.stations[i] });
-            
-            // Use fewer segments for smoother but efficient lines
-            const inter = interpolatePoints(p1, p2, 5); 
-            inter.forEach(p => forwardPath.push(p));
-        }
-        forwardPath.push({ location: stations[line.stations[line.stations.length-1]], name: line.stations[line.stations.length-1] });
+        // 1. Shared Track (Single track per line)
+        const path: TrackPoint[] = [];
+        line.stations.forEach(stationId => {
+             path.push({ location: stations[stationId], name: stationId });
+        });
 
-        const trackIdFwd = `track_${line.id}_fwd`;
-        tracks[trackIdFwd] = {
-            id: trackIdFwd,
-            path: forwardPath,
+        const trackId = `track_${line.id}`;
+        tracks[trackId] = {
+            id: trackId,
+            path: path,
             color: line.color
         };
 
-        // 2. Backward Track
-        const backwardPath = [...forwardPath].reverse().map(p => ({
-            // Slight offset for visual separation (approx 10m)
-            location: [p.location[0] + 0.0001, p.location[1] + 0.0001] as [number, number], 
-            name: p.name
-        }));
-        const trackIdBwd = `track_${line.id}_bwd`;
-        tracks[trackIdBwd] = {
-            id: trackIdBwd,
-            path: backwardPath,
-            color: line.color
-        };
-
-        // 3. Generate Schedule
+        // 2. Generate Schedule (Forward & Backward)
         const now = Date.now();
         // Schedule Config:
         // - High frequency for urban lines (ISL, TWL, KTL, TKL): 3 mins
         // - Medium for others: 5-8 mins
         const interval = ['ISL', 'TWL', 'KTL', 'TKL'].includes(line.id.split('_')[0]) ? 3 * 60 * 1000 : 6 * 60 * 1000;
         
-        generateSchedule(stations, trips, line.id, trackIdFwd, line.stations, now, interval, 15);
-        generateSchedule(stations, trips, line.id, trackIdBwd, [...line.stations].reverse(), now + 120000, interval, 15);
+        // Forward
+        generateSchedule(stations, trips, line.id, trackId, line.stations, now, interval, 15);
+        
+        // Backward (pass reversed station list, but same trackId)
+        generateSchedule(stations, trips, line.id, trackId, [...line.stations].reverse(), now + 120000, interval, 15);
     });
 
     return {

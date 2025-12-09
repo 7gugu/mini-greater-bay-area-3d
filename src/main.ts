@@ -122,7 +122,7 @@ AMapLoader.load({
                 color: new THREE.Color(color),
                 opacity: 0.8,
                 transparent: true,
-                lineWidth: 60, // World units
+                lineWidth: 30, // World units
                 resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
                 sizeAttenuation: 1, 
                 near: camera.near,
@@ -138,7 +138,7 @@ AMapLoader.load({
             track.path.forEach((p, idx) => {
                 if (p.name) {
                     const pos = coords[idx];
-                    const stationGeo = new THREE.CylinderGeometry(180, 180, 10, 32);
+                    const stationGeo = new THREE.CylinderGeometry(90, 90, 10, 32);
                     stationGeo.rotateX(Math.PI / 2); 
                     
                     const fillMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -147,7 +147,7 @@ AMapLoader.load({
                     scene.add(stationMesh);
                     stationMeshes.push(stationMesh);
 
-                    const borderGeo = new THREE.RingGeometry(150, 210, 32);
+                    const borderGeo = new THREE.RingGeometry(75, 105, 32);
                     const borderMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
                     const borderMesh = new THREE.Mesh(borderGeo, borderMat);
                     borderMesh.position.set(pos[0], pos[1], 26);

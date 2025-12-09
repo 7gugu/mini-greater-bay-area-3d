@@ -41,6 +41,9 @@ export interface TripLeg {
     // Timing (Unix Timestamps in ms)
     departureTime: number;
     arrivalTime: number;
+
+    // Direction (1 for forward along track path, -1 for backward)
+    direction?: number;
 }
 
 /**
